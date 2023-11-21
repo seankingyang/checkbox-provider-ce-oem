@@ -1,0 +1,10 @@
+id: mir_test-automated
+unit: test plan
+_name: Auto Mir test
+_description: Auto graphics test on Mir
+include:
+    mir_test/checking-ubuntu-frame-auto
+    mir_test/glmark2-es2-wayland-auto
+    after-suspend-mir_test/checking-ubuntu-frame-auto
+    after-suspend-mir_test/glmark2-es2-wayland-auto
+

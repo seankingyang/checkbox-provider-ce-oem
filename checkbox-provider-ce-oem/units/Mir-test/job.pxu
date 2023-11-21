@@ -1,0 +1,68 @@
+id: mir_test/checking-ubuntu-frame-auto
+category_id: mir_test
+plugin: shell
+flags: also-after-suspend
+user: root
+requires: snap.name == "ubuntu-frame"
+_summary: Test if Ubuntu-Frame can be brought up
+command:
+    # ubuntu-frame is active already
+    if ps -aux | grep -q "[u]buntu-frame"; then
+        echo "The ubuntu-frame is active"
+        echo "No need to bring it up again"
+        echo
+        echo "journal log of ubuntu frame:"
+        journalctl -b 0 | grep "ubuntu-frame"
+        touch "$PLAINBOX_SESSION_SHARE/ubuntu-frame-is-activating"
+        exit 0
+    fi
+    timeout --preserve-status 30 ubuntu-frame
+
+id: mir_test/glmark2-es2-wayland-auto
+category_id: mir_test
+plugin: shell
+flags: also-after-suspend
+user: root
+depends: mir_test/checking-ubuntu-frame-auto
+requires: snap.name == "graphics-test-tools"
+_summary: Run OpenGL ES 2.0 Wayland benchmark on the video card
+environ:  PLAINBOX_SESSION_SHARE GL_VENDOR GL_VERSION
+command:
+    GL_VENDOR=${GL_VENDOR:-"Intel"}
+    GL_VERSION=${GL_VERSION:-"Mesa"}
+    CMD="env XDG_RUNTIME_DIR=/run/user/0 graphics-test-tools.glmark2-es2-wayland"
+    OUTPUT=""
+    EXIT=0
+    if [ -f "$PLAINBOX_SESSION_SHARE/ubuntu-frame-is-activating" ]; then
+        OUTPUT=$($CMD)
+        rm "$PLAINBOX_SESSION_SHARE/ubuntu-frame-is-activating"
+    else
+        ubuntu-frame &
+        FRAME_PID=$!
+        sleep 10     # Sleep a while to make sure ubuntu-frame can be brought up before glamrk2-es2-wayland
+        OUTPUT=$($CMD)
+        kill "$FRAME_PID"
+    fi
+    echo "$OUTPUT"
+    
+    if [ -z "$GL_VENDOR" ] || [ -z "$GL_VERSION"  ];then
+        echo "FAIL: 'GL_VENDOR' or 'GL_VERSION' is empty. Please set them in config file!"
+        exit 1
+    fi
+
+
+    if ! echo "$OUTPUT" | grep "GL_VENDOR" | grep -q $GL_VENDOR; then
+        echo "FAIL: Wrong vendor!"
+        echo "The expected 'GL_VENDOR' is '$GL_VENDOR'!"
+        EXIT=1
+    else
+        echo "PASS: GL_VENDOR is '$GL_VENDOR'"
+    fi
+    if ! echo "$OUTPUT" | grep "GL_VERSION" | grep -q "$GL_VERSION"; then
+        echo "FAIL: Wrong version!"
+        echo "The expected 'GL_VERSION' should include '$GL_VERSION'"
+        EXIT=1
+    else
+        echo "PASS: GL_VERSION is '$GL_VERSION'"
+    fi
+    exit $EXIT
